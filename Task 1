@@ -1,0 +1,128 @@
+#Task 1 State Vector simulation of quantum circuits
+
+#(1) Naive simulation using matrix multiplication
+
+import numpy as np
+import time
+import matplotlib.pyplot as plt
+
+# Define gate matrices
+I = np.array([[1, 0], [0, 1]])
+X = np.array([[0, 1], [1, 0]])
+H = (1 / np.sqrt(2)) * np.array([[1, 1], [1, -1]])
+CNOT = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]])
+
+# Function to create an n-qubit |0...0> state
+def initialize_state(n):
+    state = np.array([1] + [0] * (2**n - 1))
+    return state
+
+# Function to apply a single-qubit gate to the k-th qubit in an n-qubit system
+def apply_single_qubit_gate(state, gate, n, k):
+    # Start with identity across all qubits
+    gate_full = 1
+    for i in range(n):
+        if i == k:
+            gate_full = np.kron(gate_full, gate)
+        else:
+            gate_full = np.kron(gate_full, I)
+    # Apply gate matrix multiplication to the state vector
+    return gate_full @ state
+
+# Example runtime measurement for applying Hadamard gates to an n-qubit system
+n_qubits = list(range(1, 10))  # Test up to 9 qubits for naive simulation
+runtime = []
+
+for n in n_qubits:
+    state = initialize_state(n)
+    
+    start_time = time.time()
+    for i in range(n):
+        state = apply_single_qubit_gate(state, H, n, i)
+    runtime.append(time.time() - start_time)
+
+# Plot runtime vs. number of qubits
+plt.plot(n_qubits, runtime)
+plt.xlabel("Number of Qubits")
+plt.ylabel("Runtime (seconds)")
+plt.title("Runtime of Naive Simulation Using Matrix Multiplication")
+plt.show()
+
+#Discussion: This code measures the runtime for different numbers of qubits. The exponential growth of the state vector (size 2**n) means the runtime will also grow exponentially. 
+#For a standard implementation, we will notice that simulating more than 14-15 qubits is likely infeasible due to memory and time constraints.
+
+
+#(2) Advanced Simulation Using Tensor Multiplication
+
+# Function to initialize an n-qubit state as a tensor
+def initialize_tensor_state(n):
+    state = np.zeros([2] * n)
+    state[(0,) * n] = 1  # Set the |0...0> state
+    return state
+
+# Function to apply a single-qubit gate to the k-th qubit in an n-qubit system
+def apply_gate_tensor(state_tensor, gate, n, k):
+    axes = ([1], [k])  # Contract the second axis of gate with the k-th qubit axis in state_tensor
+    gate_tensor = np.reshape(gate, [2, 2])  # Reshape gate to be 2x2
+    state_tensor = np.tensordot(gate_tensor, state_tensor, axes=axes)
+    # Move the contracted axis to the k-th position
+    state_tensor = np.moveaxis(state_tensor, 0, k)
+    return state_tensor
+
+# Example runtime measurement for tensor simulation
+runtime_tensor = []
+
+for n in n_qubits:
+    state_tensor = initialize_tensor_state(n)
+    
+    start_time = time.time()
+    for i in range(n):
+        state_tensor = apply_gate_tensor(state_tensor, H, n, i)
+    runtime_tensor.append(time.time() - start_time)
+
+# Plot runtime vs. number of qubits for tensor simulation
+plt.plot(n_qubits, runtime_tensor)
+plt.xlabel("Number of Qubits")
+plt.ylabel("Runtime (seconds)")
+plt.title("Runtime of Tensor-Based Simulation")
+plt.show()
+#Tensor-based simulation is generally faster and can handle slightly more qubits than the matrix-based approach, but it also becomes exponentially slow beyond a certain number of qubits.
+
+#(3) Bonus Question – Sampling and Expectation Values
+import numpy as np
+
+# Define a sample quantum state vector (example for 2-qubit system in |ψ⟩ = α|00⟩ + β|01⟩ + γ|10⟩ + δ|11⟩)
+# Assuming state vector for |ψ⟩ = 1/2(|00⟩ + |01⟩ + |10⟩ + |11⟩)
+state_vector = np.array([1/2, 1/2, 1/2, 1/2], dtype=complex)
+
+# Function to sample from the state vector
+def sample_from_state_vector(state_vector, num_samples=1000):
+    # Calculate probability distribution from the state vector
+    probabilities = np.abs(state_vector) ** 2
+    # Define the possible basis states as integers (e.g., 0=|00⟩, 1=|01⟩, etc.)
+    basis_states = np.arange(len(state_vector))
+    # Perform sampling based on the calculated probabilities
+    samples = np.random.choice(basis_states, size=num_samples, p=probabilities)
+    return samples
+
+# Example: Sample 1000 times from the state vector
+samples = sample_from_state_vector(state_vector, num_samples=1000)
+
+# Print the counts of each basis state
+from collections import Counter
+print("Sample counts for each basis state:", Counter(samples))
+
+# Define an example operator (for example, let's use Z ⊗ Z for a 2-qubit system)
+Z = np.array([[1, 0], [0, -1]])
+O = np.kron(Z, Z)  # Z ⊗ Z operator on 2 qubits
+
+# Function to calculate the expectation value of an operator O in the state |ψ⟩
+def calculate_expectation_value(state_vector, operator):
+    # Compute ⟨ψ|O|ψ⟩ = ψ† O ψ
+    expectation_value = np.vdot(state_vector, operator @ state_vector)
+    return expectation_value
+
+# Calculate expectation value of the operator O in the given state
+expectation_value = calculate_expectation_value(state_vector, O)
+print("Expectation value ⟨ψ|O|ψ⟩:", expectation_value.real)
+#This code allows for sampling and calculating expectation values for any operator on a quantum state vector, which can be adapted to larger systems by extending the state vector and operator matrix sizes accordingly.
